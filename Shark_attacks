@@ -1,0 +1,303 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+url = 'https://raw.githubusercontent.com/Twoltinge/Data/main/attacks.csv'
+df = pd.read_csv(url, encoding='ISO-8859-1')
+
+# Cleaning the data that is not needed for all questions
+df1 = df.drop(columns=['Case Number', 'Date', 'Year', 'Country', 'Area', 'Location', 'Name', 'Sex ', 'Time', 'Investigator or Source', 'pdf', 'href formula', 'href', 'Case Number.1', 'Case Number.2', 'original order', 'Unnamed: 22', 'Unnamed: 23'])
+df2 = df1.rename(columns={'Fatal (Y/N)': 'Fatal', 'Species ': 'Species'}) # Because the names are easier
+df2 = df2.dropna(how='all') # Because there is no data in those rows
+
+###############################################################################
+# To find the non-default missing values
+def print_separator(sep, num, msg):
+  print("\n")
+  print(sep * num)
+  print(f"{msg}")
+  print(sep * num)
+
+# A
+def look_at_unique_values(column): 
+  unique_values_cutoff = 50
+  unique_values = column.unique()
+  num_unique_values = len(unique_values)
+  if num_unique_values == len(column):
+    print(f"Each value in the column is unique (total: {num_unique_values})")
+  elif num_unique_values < unique_values_cutoff:
+    print(f"Less than {unique_values_cutoff} unique values:")
+    # We may get an error when sorting
+    try:
+      sorted = np.sort(unique_values)
+      print("Values are sorted")
+      display(list(sorted))
+    except:
+      print("Could not sort values")
+      display(list(unique_values))
+  else:
+    print(f"More than {unique_values_cutoff} unique values (total: {num_unique_values})")
+
+# B
+def look_at_edges(df, column_name):
+  # inner function
+  def show_head_and_tail(values):
+      num_items_to_slice = 10
+      display(list(values)[:num_items_to_slice])
+      display(list(values)[-num_items_to_slice:])
+
+  column = df[column_name]
+  unique_values = column.unique()
+  try:
+      sorted = np.sort(unique_values)
+      print("Unique values sorted, head and tail:")
+      show_head_and_tail(sorted)
+  except TypeError as error:
+      print(f"Could not sort values: {error}")
+      print("..so let's try filtering NULL values and then sorting")
+      non_null_uniques = df.loc[~df[column_name].isnull(), column_name].unique()
+      sorted = np.sort(non_null_uniques)
+      show_head_and_tail(sorted)
+
+# C
+def cast_to_type(column, maybe_type):
+  try:
+    column.astype(maybe_type)
+    print(f"Casting to {maybe_type} was successful")
+  except ValueError as error:
+    print(f"Could not cast to {maybe_type}: {error}")
+
+def find_non_default_missing_values(df, column_name, maybe_type):
+  long_separator_amount = 80
+  short_separator_amount = 40
+
+  print_separator("*", long_separator_amount, f"Finding non default missing values for column \"{column_name}\"")
+
+  print(f"Column \"{column_name}\" has datatype: {df.dtypes[column_name]}")
+
+  column = df[column_name]  
+
+  # A
+  print_separator("-", short_separator_amount, "A: Looking at unique values")
+  look_at_unique_values(column)
+
+  # B
+  print_separator("-", short_separator_amount, "B: Sorting and looking at the edges")
+  look_at_edges(df, column_name)
+
+  # C
+  print_separator("-", short_separator_amount, f"C: Casting to type: {maybe_type}")
+  cast_to_type(column, maybe_type)
+
+  # D
+  print_separator("-", short_separator_amount, "D: Looking at frequency")
+  display (column.value_counts(dropna=False))
+
+  print("\n")
+###############################################################################
+# To replace non-default missing values
+df3 = df2.copy()
+
+def replace_value(df, column_name, missing_old, missing_new):
+  df[column_name] = df[column_name].replace({missing_old: missing_new})
+
+#  Type
+replace_value(df3, 'Type', 'Boat', 'Unprovoked')
+replace_value(df3, 'Type', 'Boating', 'Unprovoked')
+replace_value(df3, 'Type', 'Boatomg', 'Unprovoked')
+replace_value(df3, 'Type', 'Invalid', np.nan)
+replace_value(df3, 'Type', 'Questionable', np.nan)
+# find_non_default_missing_values(df3, 'Type',"string")
+
+# Activity
+replace_value(df3, 'Activity', ' ', np.nan)
+replace_value(df3, 'Activity', '   ', np.nan)
+replace_value(df3, 'Activity', '.', np.nan)
+# find_non_default_missing_values(df3, 'Activity',"string")
+
+# Age
+replace_value(df3, 'Age', '', np.nan)
+replace_value(df3, 'Age', ' ', np.nan)
+replace_value(df3, 'Age', '  ', np.nan)
+replace_value(df3, 'Age', 'X', np.nan)
+replace_value(df3, 'Age', 'MAKE LINE GREEN', np.nan)
+replace_value(df3, 'Age', '\xa0', np.nan)
+# find_non_default_missing_values(df3, 'Age',"string")
+
+# Injury
+# find_non_default_missing_values(df3, 'Injury', "string")
+
+# Fatal
+replace_value(df3, 'Fatal', 'UNKNOWN', np.nan)
+replace_value(df3, 'Fatal', 'M', np.nan)
+replace_value(df3, 'Fatal', '2017', np.nan)
+replace_value(df3, 'Fatal', ' N', 'N')
+replace_value(df3, 'Fatal', 'N ', 'N')
+replace_value(df3, 'Fatal', 'y', 'Y')
+# find_non_default_missing_values(df3, 'Fatal',"string")
+
+# Species 
+replace_value(df3, 'Species', '', 'Unknown shark')
+replace_value(df3, 'Species', ' ', 'Unknown shark')
+replace_value(df3, 'Species', '  ', 'Unknown shark')
+replace_value(df3, 'Species', '\xa0 ', 'Unknown shark')
+replace_value(df3, 'Species', np.nan, 'Unknown shark')
+# find_non_default_missing_values(df3, 'Species',"string")
+###############################################################################
+
+# Dropping rows that are not used
+df3 = df3[df3['Species'].str.contains('Questionable|confirmed|involvement|Invalid|No shark') == False] # Because there was no shark-attack if there was no shark
+df3 = df3[df3['Type'].str.contains('Sea disaster', case=False) == False] # Because a sea disaster is not a shark attack (More like feeding the sharks that are already there)
+
+##################### Start question 1.########################################
+# 1.	What are the most dangerous types of sharks to humans?
+df_shark_species = df3.copy()
+
+# # Get an overview of all present species in the dataframe for the dictionary of species
+# pd.set_option('display.max_rows', None)
+# count_species = df_shark_species.Species.value_counts()
+# print(count_species)
+
+# Replace values for species of sharks in new column
+dict_of_most_freq_sharks = dict({'white':'White shark', 'tiger':'Tiger shark', 'lemon':'Lemon shark', 'bull':'Bull shark', 'reef':'Reef shark', 'nurse':'Nurse shark', 'wobbegong':'Wobbegong shark', 'black':'Blacktip shark', 'blue':'Blue shark', 'spinner':'Spinner shark', 'whitetip':'Whitetip shark', 'sand':'Sand shark', 'seven':'Sevengill shark', 'dog':'Dog shark', 'mako':'Mako shark', 'bronze':'Bronze whaler shark', 'hammer':'Hammerhead shark', 'ragged':'Raggedtooth shark', '7':'Sevengill shark', 'galapagos':'Galapagos shark', 'cookie':'Cookiecutter shark', 'porbeagle':'Porbeagle shark', 'smooth':'Smoothhound shark','silky':'Silky shark', 'cow':'Cow shark', 'salmon':'Salmon shark', 'port jackson':'Port Jackson shark', 'thresher':'Thresher shark', 'spurdog':'Spurdog shark', 'basking':'Basking shark', 'goblin':'Goblin shark', 'shovelnose':'Shovelnose guitarfish', 'ground':'Ground shark', 'silvertip':'Silvertip shark', 'unknown':'Unknown shark'})
+
+def replace_values(df, column_name, column_new, dictionary, string_nan):
+  for key, value in dictionary.items():
+    df.loc[df[column_name].str.contains(key, case=False), column_new] = value
+    df[column_new] = df[column_new].fillna(string_nan)
+  return df
+
+replace_values(df_shark_species, 'Species', 'Species_2', dict_of_most_freq_sharks, 'Unknown shark')
+
+# Count total sharks if Fatal = Yes or No
+df_shark_species = df_shark_species.groupby(['Fatal','Species_2'])['Species_2'].count().reset_index(name='Number_of_sharks')
+df_shark_species = df_shark_species.sort_values(['Fatal','Number_of_sharks'])
+df_shark_species = df_shark_species[df_shark_species['Number_of_sharks'] > 50]
+
+print('Question 1.')
+display(df_shark_species)
+print("\n")
+##################### End of question 1.########################################
+
+
+##################### Start question 2.#########################################
+# 2. Are children more likely to be attacked by sharks?
+df_age = df3.copy()
+
+# Extract the ages from column 'Age' to a new column
+df_age['Age_in_numbers'] = df_age['Age'].str.extract('(\d+)')
+df_age = df_age.dropna(subset=['Age_in_numbers'])
+df_age['Age_in_numbers'] = df_age['Age_in_numbers'].astype(int)
+df_age = df_age.sort_values(['Age_in_numbers'])
+
+# Count the number of attacks per age
+df_age = df_age.groupby('Age_in_numbers')['Age_in_numbers'].count().reset_index(name='Number_of_attacks')
+df_age = df_age.sort_values(['Age_in_numbers'])
+
+# Make plot to show Age and number of attacks 
+print('Question 2.')
+fig, ax = plt.subplots()
+x = df_age['Age_in_numbers']
+y = df_age['Number_of_attacks']
+
+ax.scatter(x, y)
+plt.xlabel('Age')
+plt.ylabel('Number of attacks')
+plt.title('Number of attacks per age')
+ax.grid(True)
+xtwelve = 12
+xeighteen = 18
+xyoungadults = 25
+ax.axvline(xtwelve, color='r', linewidth=2)
+ax.axvline(xeighteen, color='r', linewidth=2)
+ax.axvline(xyoungadults, color='r', linewidth=2)
+plt.xticks(x)
+ax.set_ylim(bottom=0)
+ax.set_xlim(left=0)
+fig.set_size_inches(20,10)
+plt.show()
+print("\n")
+##################### End of question 2.########################################
+
+
+##################### Start question 3.#########################################
+# 3. Are shark attacks where sharks were provoked more or less dangerous?
+df_provoked = df3.copy()
+
+# Drop NaN values
+df_provoked = df_provoked.dropna(subset=['Type'])
+
+# Making new column to split 'Injury', 'Fatal' and 'No injury'
+df_provoked = df_provoked.dropna(subset=['Injury'])
+df_provoked.loc[df_provoked['Injury'].str.contains('No injury', case=False), 'New_Injury'] = 'No injury'
+df_provoked.loc[df_provoked['Injury'].str.contains('FATAL', case=False), 'New_Injury'] = 'FATAL'
+df_provoked['New_Injury'] = df_provoked['New_Injury'].fillna('Injured')
+
+# Count total injuries, fatalities and no injuries for provoked and not provoked
+df_provoked = df_provoked.groupby(['Type','New_Injury'])['New_Injury'].count().reset_index(name='Number_of_injuries')
+df_provoked = df_provoked.sort_values(['Type', 'New_Injury'])
+
+# Calculating the percentage of injuries, fatalities and no injuries to the total provoked and unprovoked
+rows_provoked = len(df3[df3['Type'] == 'Provoked'])
+rows_unprovoked = len(df3[df3['Type'] == 'Unprovoked'])
+
+number_of_injuries_provoked = df_provoked.loc[df_provoked['Type'] == 'Provoked', 'Number_of_injuries']
+number_of_injuries_unprovoked = df_provoked.loc[df_provoked['Type'] == 'Unprovoked', 'Number_of_injuries']
+
+df_provoked['Percentage_of_injuries_provoked'] = (number_of_injuries_provoked / rows_provoked * 100)
+df_provoked['Percentage_of_injuries_unprovoked'] = (number_of_injuries_unprovoked / rows_unprovoked * 100)
+df_provoked['Percentage_of_injuries_provoked'] = df_provoked['Percentage_of_injuries_provoked'].fillna(0)
+df_provoked['Percentage_of_injuries_unprovoked'] = df_provoked['Percentage_of_injuries_unprovoked'].fillna(0)
+df_provoked[['Percentage_of_injuries_provoked','Percentage_of_injuries_unprovoked']] = df_provoked[['Percentage_of_injuries_provoked','Percentage_of_injuries_unprovoked']].apply(lambda x: pd.Series.round(x, 2))
+
+print('Question 3.')
+display(df_provoked)
+print("\n")
+##################### End of question 3.########################################
+
+
+##################### Start question 4.#########################################
+# 4. Are certain activities more likely to result in a shark attack?
+df_activities = df3.copy()
+
+# Get an overview of all present activities in the dataframe for the dictionary of activities
+# pd.set_option('display.max_rows', None)
+# count_activities = df_activities.Activity.value_counts()
+# print(count_activities)
+
+# Drop NaN values
+df_activities = df_activities.dropna(subset=['Activity'])
+
+# Replace values for activities in new column
+dict_of_most_freq_act = dict({'surf':'Surfing, Surf-skiing, Body-surfing, Kite-surfing, Windsurfing', 'swim':'Swimming', 'fish':'Fishing', 'bath':'Bathing', 'wading':'Wading', 'diving':'Diving', 'stand':'Standing in water', 'snork':'Snorkeling', 'kayak':'Kayaking', 'tread':'Treading water', 'float':'Floating', 'canoe':'Canoeing', 'row':'Rowing', 'play':'Playing', 'sail':'Sailing', 'boat':'Boating', 'splash':'Splashing', 'drill':'Lifesaving drill', 'murder':'Murder', 'jump':'Jumping', 'cruising':'Cruising', 'netting':'Netting', 'sup':'SUP', 'jet':'Jet-skiing', 'sculling':'Sculling', 'overboard':'Fell or jumped overboard', 'fell':'Fell into the water', 'paddle':'Paddle-skiing, Paddle-boarding or Paddling', 'boarding':'Body-boarding, Kite-boarding, Boogie-boarding', 'shark':'Shark-fishing, Tagging sharks, Feeding sharks'})
+
+def replace_values(df, column_name, column_new, dictionary, string_nan):
+  for key, value in dictionary.items():
+    df.loc[df[column_name].str.contains(key, case=False), column_new] = value
+    df[column_new] = df[column_new].fillna(string_nan)
+  return df
+
+replace_values(df_activities, 'Activity', 'Activity_2', dict_of_most_freq_act, 'Unknown activity')
+
+# Count the number of attacks per activity
+df_activities = df_activities.groupby('Activity_2')['Activity_2'].count().reset_index(name='Number_of_attacks')
+df_activities = df_activities.sort_values(['Number_of_attacks'])
+
+# # Make plot to show activity and number of attacks 
+print('Question 4.')
+fig, ax = plt.subplots()
+x = df_activities['Activity_2']
+y = df_activities['Number_of_attacks']
+
+ax.scatter(x, y)
+plt.xlabel('Activity')
+plt.ylabel('Number of attacks')
+plt.title('Number of attacks per activity')
+ax.grid(True)
+plt.xticks(x)
+plt.xticks(rotation=90)
+ax.set_ylim(bottom=0)
+ax.set_xlim(left=0)
+fig.set_size_inches(30,10)
+plt.show()
+##################### End of question 4.########################################
